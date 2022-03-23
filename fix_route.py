@@ -18,7 +18,7 @@ def record_input(x_stack, y_stack, spd_stack, spd, ang, t_interval = 0.01):
         y_stack.append(0.0)
         spd_stack.append(0.5)  #this may cause BUG
         
-    while read_state() == 0:
+    if read_state() == 0:
         x_new = x_stack[-1] + spd * t_interval * np.cos(ang)
         y_new = y_stack[-1] + spd * t_interval * np.sin(ang)
         x_stack.append(x_new)
@@ -32,7 +32,7 @@ def record_output(x_stack, y_stack, spd_stack, t_interval = 0.01):
     step_size = 1
     nxt_run = 0
     now_run = length
-    while read_state() == 1:
+    if read_state() == 1:
         x_direc = x_stack[nxt_run] - x_stack[now_run]
         y_direc = y_stack[nxt_run] - y_stack[now_run]
         ins_ang = np.arctan2(y_direc, x_direc)
@@ -47,10 +47,11 @@ def record_output(x_stack, y_stack, spd_stack, t_interval = 0.01):
     return 
 
 def lds_hold(ser, rge_old):
-    hold = 0
-    rge = lds_driver.lds_poll(ser)
-    if min(rge) < 1 and max(rge_old - rge) > 0.8:
-        hold = 1
+    if read_state() == 1:
+        hold = 0
+        rge = lds_driver.lds_poll(ser)
+        if min(rge) < 1 and max(rge_old - rge) > 0.8:
+            hold = 1
     return rge, hold
 
 def fix_route_main(t = 0.01):
