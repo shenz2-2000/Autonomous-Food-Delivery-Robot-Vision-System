@@ -32,11 +32,8 @@ def lds_poll(ser):
                 data = ser.read(2518)
                 for i in range(2518):
                     raw_bytes[2+i] = data[i]
-                #print(int_to_bytes(data[0]))
-                #print(data)
+
                 for i in range(0,2520,42):
-                    #print(bytes_to_int(int_to_bytes(raw_bytes[i+1])), ' ', bytes_to_int(b'\xa0') + int(i / 42))
-                    #print(int_to_bytes(raw_bytes[i]) == b'\xfa', ' ', int_to_bytes(raw_bytes[i+1]) == (b'\xa0' + int_to_bytes(int(i / 42))))
                     if (int_to_bytes(raw_bytes[i]) == b'\xfa' and raw_bytes[i+1] == bytes_to_int(b'\xa0') + (int(i / 42))):
                     
                         good_sets+=1
@@ -52,22 +49,30 @@ def lds_poll(ser):
                             #res[359-int(index)] = rge / 1000.0
                             res[int(index)] = rge / 1000.0
                             #print('r[%d]=%f' %(int(index),rge / 1000.0))
-                            print(res[100])
+                            #print(res[100])
 
             else:
                 start_count = 0
-            
+  
         #print(res)             
-    return 
+    return res 
+
 def lds_driver_init():
+    # Setting up baud rate and io service
+    port = '/dev/ttyUSB0'
+    baud_rate = 230400
+    ser = serial.Serial(port, baud_rate)
+    return ser
+
+def lds_driver_test():
     # Setting up baud rate and io service
     port = '/dev/ttyUSB0'
     baud_rate = 230400
     ser = serial.Serial(port, baud_rate)
 
     while (1):
-        lds_poll(ser)
-    
+        res = lds_poll(ser)
+        print(res[100])
     return
 
-lds_driver_init()
+lds_driver_test()
