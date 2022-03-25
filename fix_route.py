@@ -50,7 +50,7 @@ def lds_hold(ser, rge_old):
     if read_state() == 1:
         hold = 0
         rge = lds_driver.lds_poll(ser)
-        if min(rge) < 1 and max(rge_old - rge) > 0.8:
+        if min(rge) < 1 and max(rge_old - rge) > 0.5:
             hold = 1
     return rge, hold
 
@@ -66,7 +66,9 @@ def fix_route_main(t = 0.01):
         record_output(x_stack, y_stack, spd_stack)
         rge_old, hold = lds_hold(ser, rge_old)
         if hold == 1:
+            print('LDS Hold Start')
             time.sleep(5)
+            print('LDS Hold End')
     return
 
 fix_route_main()
