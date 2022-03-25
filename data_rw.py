@@ -31,8 +31,8 @@ def data_rw(data_send, dev, len_msg = 12):
     bytes_send.append(int_to_bytes(data_send[2]))
     bytes_send.append(data_send[3])
     dev.reset()
-    pkg = array.array('B', data_send)
-    num_bytes = dev.write(1,pkg)
+    #pkg = array.array('B', bytes_send)
+    num_bytes = dev.write(1,bytes_send)
     
     #read data from stm32
     unit_array = [1, 1, 1, 1, 360/8192, 1, 1]
