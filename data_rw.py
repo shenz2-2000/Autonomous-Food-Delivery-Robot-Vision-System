@@ -1,5 +1,6 @@
 import usb.core
 import usb.util
+from spd_solve import get_chasis_spd
 import numpy as np
 
 def int_to_bytes(x: int) -> bytes:
@@ -59,4 +60,4 @@ def data_read(dev, len_msg = 13):
     data_stack.append((read_byte[12]))
     data_stack[4] = data_stack[4]*360/8192
     
-    return data_stack[0], data_stack[1], data_stack[2], data_stack[3], data_stack[4], data_stack[5]
+    return get_chasis_spd(data_stack[0], data_stack[1], data_stack[2], data_stack[3]), data_stack[4], data_stack[5]

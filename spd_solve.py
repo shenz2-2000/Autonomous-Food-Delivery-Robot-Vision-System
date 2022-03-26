@@ -1,6 +1,6 @@
 import numpy as np
 
-def get_chasis_spd(v_fr, v_fl, v_br, v_bl):
+def get_chasis_spd(v_fr, v_fl, v_bl, v_br):
     #w_to_v_ratio = (wheel_base + wheel_tread) / 2 / 360 * np.pi
     w_to_v_ratio = (420 + 372) / 2 / 360 * np.pi
     #v_to_wheel = 360 / wheel_circumference
@@ -44,7 +44,7 @@ def get_chasis_spd(v_fr, v_fl, v_br, v_bl):
     v_y = sum[1] / num_of_ave
     w = sum[2] / num_of_ave /  w_to_v_ratio
     spd = np.sqrt(v_x**2 + v_y**2)
-    print(v_x,v_y,w)
+    # print(v_x,v_y,w)
     return spd
     # This fucking spd should be the absolute speed if work as expected, mm/s
     #return v_x,v_y,w 
