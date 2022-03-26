@@ -6,7 +6,9 @@ import time
 
 def read_state():
     #this should read from stm32 and return the current mode
-    #assume 0 is for recording route and 1 is for running
+    # 0: nano controlling
+    # 1: remote controller controlling
+    # 2: programming 
     current_state = 0
     
     return current_state
@@ -28,6 +30,8 @@ def record_input(x_stack, y_stack, spd_stack, spd, ang, t_interval = 0.01):
     return
     
 def record_output(x_stack, y_stack, spd_stack, t_interval = 0.01):
+    
+    
     length = len(x_stack)
     step_size = 1
     nxt_run = 0

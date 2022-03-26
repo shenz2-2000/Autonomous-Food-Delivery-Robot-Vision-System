@@ -36,14 +36,16 @@ def data_send(data_send, dev):
     bytes_send.extend([Vy>>8, Vy&0xff]) #send vy
     bytes_send.extend([alpha*8192/360>>8, alpha*8192/360&0xff]) #send alpha/360*8192
     bytes_send.append(mode)
-    bytes_send.append(error)
+    bytes_send.append(error_status)
 
-    return 
-
-def data_read(dev, len_msg = 13)
-    dev.reset()
     #pkg = array.array('B', bytes_send)
     num_bytes = dev.write(1,bytes_send)
+    
+    return 
+
+def data_read(dev, len_msg = 13):
+    dev.reset()
+    
     
     #read data from stm32
     # data_stack format [V_FR, V_FL, V_BL, V_BR, alpha, mode, error]
