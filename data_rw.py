@@ -53,7 +53,7 @@ def data_read(dev, len_msg = 13):
     read_byte = dev.read(0x81, len_msg, 100)
     data_stack = []
     for i in range(1, 11, 2):
-        tem_data = (read_byte[i] << 8 + read_byte[i+1])
+        tem_data = (int(read_byte[i] << 8) + int(read_byte[i+1]))
         data_stack.append(tem_data)
 
     data_stack.append((read_byte[11]))
