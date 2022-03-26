@@ -1,79 +1,124 @@
 from time import time
 import numpy as np
+import threading
 from matplotlib import pyplot as plt
 import lds_driver
 import time
+from data_rw import data_send, init_data_rw, data_read
 
-def read_state():
-    #this should read from stm32 and return the current mode
-    # 0: nano controlling
-    # 1: remote controller controlling
-    # 2: programming 
-    current_state = 0
-    
-    return current_state
-
-def record_input(x_stack, y_stack, spd_stack, spd, ang, t_interval = 0.01):
+def record_input(cur_state, x_stack, y_stack, spd_stack, spd, ang, t_interval = 0.01):
     if (x_stack == []):
         # Handle initial condition
         x_stack.append(0.0)
         y_stack.append(0.0)
         spd_stack.append(0.5)  #this may cause BUG
         
-    if read_state() == 0:
-        x_new = x_stack[-1] + spd * t_interval * np.cos(ang)
-        y_new = y_stack[-1] + spd * t_interval * np.sin(ang)
-        x_stack.append(x_new)
-        y_stack.append(y_new)
-        spd_stack.append(spd)
+    x_new = x_stack[-1] + spd * t_interval * np.cos(ang/180*np.pi)
+    y_new = y_stack[-1] + spd * t_interval * np.sin(ang/180*np.pi)
+    x_stack.append(x_new)
+    y_stack.append(y_new)
+    spd_stack.append(spd)
 
     return
     
-def record_output(x_stack, y_stack, spd_stack, t_interval = 0.01):
+def record_output(x_stack, y_stack, spd_stack, cur_point):
     
     
     length = len(x_stack)
     step_size = 1
-    nxt_run = 0
-    now_run = length
-    if read_state() == 1:
-        x_direc = x_stack[nxt_run] - x_stack[now_run]
-        y_direc = y_stack[nxt_run] - y_stack[now_run]
-        ins_ang = np.arctan2(y_direc, x_direc)
-        ins_spd = spd_stack[now_run]    #The speed will cause problem if there is a 0
+    now_run, nxt_run = cur_point, cur_point + 1
+    x_direc = x_stack[nxt_run] - x_stack[now_run]
+    y_direc = y_stack[nxt_run] - y_stack[now_run]
+    ins_ang = np.arctan2(y_direc, x_direc)/pi*180 # radius, should change to degree
+    ins_ang += 180
+    ins_spd = spd_stack[now_run]    #The speed will cause problem if there is a 0
 
-        now_run = nxt_run
-        if nxt_run + step_size > length: 
-            nxt_run = 0
-        else:
-            nxt_run = nxt_run + step_size     
-        # Next, should send ins_ang, ins_spd to stm32  
+    global target_v, target_angle
+    target_v, target_angle = ins_spd, ins_ang
+
     return 
 
-def lds_hold(ser, rge_old):
-    if read_state() == 1:
-        hold = 0
+def lds_hold(cur_state, ser):
+    if cur_state == 0:
         rge = lds_driver.lds_poll(ser)
-        if min(rge) < 1 and max(rge_old - rge) > 0.5:
-            hold = 1
-    return rge, hold
+        if min(rge) < 1:
+            return 1
+    return 0
+# This one to put global vars
+x_stack,y_stack,spd_stack  = [],[],[]
+last_angle, truth_angle= None, None # This one used for null shift
+cur_v, cur_angle, mode, error_status = None, None, None, None
+target_v, target_angle, cur_point = 0, 0, 0
+record_end = False # Indicating record ends or not
 
-def fix_route_main(t = 0.01):
-    x_stack = []
-    y_stack = []
-    spd_stack = []
-    ser = lds_driver.lds_driver_init()
-    rge_old = lds_driver.lds_poll(ser)
+
+def stm32_communication():
+    '''
+        This code keep talking to stm32, and update info in the global vars
+    '''
+    global x_stack, y_stack, spd_stack, last_angle, truth_angle
+    global cur_v, cur_angle, mode, error_status, target_v, target_angle, record_end, cur_point
+    dev = init_data_rw() # will be used later in the communication
     
-    while 1:
-        record_input(x_stack, y_stack, spd_stack, spd, ang)
-        record_output(x_stack, y_stack, spd_stack)
-        rge_old, hold = lds_hold(ser, rge_old)
-        if hold == 1:
-            print('LDS Hold Start')
-            time.sleep(5)
-            print('LDS Hold End')
-    return
+    while(1):
+        cur_v, cur_angle, mode, error_status = data_read(dev)
+        if (truth_angle == None):
+            truth_angle = cur_angle
+        elif (last_angle-cur_angle > 0.2): # handle null shift
+            truth_angle = cur_angle
+        last_angle = cur_angle
+
+        if (mode == 2):
+            if (record_end == 1):
+                record_end, cur_point = 0, 0
+                x_stack, y_stack, spd_stack = [],[],[]
+
+            record_input(mode, x_stack, y_stack, spd_stack, cur_v, truth_angle)
+        elif (mode == 0):
+            record_end = 1
+
+        if (mode == 0):
+            delta_angle = (target_angle-last_angle)+180
+            
+            data = [target_v, delta_angle, mode, error_status]
+            data_send(data, dev)
+
+def route_decision():
+    '''
+        This function decide the route based on given info, only works when mode become 0 
+    '''
+    global x_stack, y_stack, spd_stack, last_angle, truth_angle
+    global cur_v, cur_angle, mode, error_status, target_v, target_angle, record_end, cur_point
+    ser = lds_driver.lds_driver_init() # init for lidar
+    while (1):
+        if (record_end = True):
+            if lds_hold(ser) == 1:
+                print('LDS Hold Start')
+                target_v, target_angle = 0, last_angle
+                time.sleep(5)
+                print('LDS Hold End')
+            
+            record_output(x_stack, y_stack, spd_stack, cur_point)
+            cur_point += 1
+            if (cur_point == len(x_stack) - 1):
+                cur_point = 0 
+
+
+        
+
+
+def fix_route_main():
+    ''' 
+        This code implement the fix route algorithm, forcing the robot to record the message, memorize it,
+        then go along this route. When detecting somebody nearby, stop.
+    '''
+    # Now comes the recording mode
+    t1 = threading.Thread(target = stm32_communication)
+    t2 = threading.Thread(target = route_decision)
+    t1.start()
+    t2.start()
+    while(1):
+        pass
 
 fix_route_main()
 
