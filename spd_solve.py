@@ -1,6 +1,6 @@
 import numpy as np
 
-def get_chasis_spd(v_fr, v_fl, v_bl, v_br):
+def get_chasis_spd(v_fr, v_fl, v_br, v_bl):
     #w_to_v_ratio = (wheel_base + wheel_tread) / 2 / 360 * np.pi
     w_to_v_ratio = (420 + 372) / 2 / 360 * np.pi
     #v_to_wheel = 360 / wheel_circumference
