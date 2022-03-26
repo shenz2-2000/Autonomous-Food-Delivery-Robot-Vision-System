@@ -13,38 +13,48 @@ def bytes_to_int(bytes):
 
 def init_data_rw():
     id_intf = 0 # use interface 0
-    ep_addr = 0x81 # receive endpoint\
-    len_msg = 12 
+    ep_addr = 0x81 # receive endpoint
     dev = usb.core.find(idVendor=0x0483, idProduct=0x5740) # find the device  
     if dev.is_kernel_driver_active(id_intf):
         dev.detach_kernel_driver(id_intf)
     return dev
 
-def data_rw(data_send, dev, len_msg = 12):
+def data_send(data_send, dev):
     #data_send should be [v, alpha, mode, error_status]
     
     #send data to stm32
     # data send is in v>>8, v, alpha/360*8192>>8, alpha/360*8192, mode, error
+    dev.reset()
+    import numpy as np
+    V = data_send[0]
+    alpha, mode, error_status = data_send[1], data_send[2], data_send[3]
+
+    Vx, Vy = V * np.cos(alpha/180*np.pi), np.sin(alpha/180*np.pi)
+
     bytes_send = []
-    bytes_send.append(int_to_bytes((data_send[0])>>8), int_to_bytes(data_send[0])) #send v
-    bytes_send.append(int_to_bytes((data_send[1]*8192/360)>>8), int_to_bytes(data_send[1]*8192/360)) #send alpha/360*8192
-    bytes_send.append(int_to_bytes(data_send[2]))
-    bytes_send.append(data_send[3])
+    bytes_send.extend([Vx>>8, Vx&0xff]) #send vx
+    bytes_send.extend([Vy>>8, Vy&0xff]) #send vy
+    bytes_send.extend([alpha*8192/360>>8, alpha*8192/360&0xff]) #send alpha/360*8192
+    bytes_send.append(mode)
+    bytes_send.append(error)
+
+    return 
+
+def data_read(dev, len_msg = 13)
     dev.reset()
     #pkg = array.array('B', bytes_send)
     num_bytes = dev.write(1,bytes_send)
     
     #read data from stm32
-    unit_array = [1, 1, 1, 1, 360/8192, 1, 1]
+    # data_stack format [V_FR, V_FL, V_BL, V_BR, alpha, mode, error]
     read_byte = dev.read(0x81, len_msg, 100)
     data_stack = []
-    for i in range(0, 10, 2):
-        tem_data = bytes_to_int(read_byte[i] << 8 + read_byte[i+1])
+    for i in range(1, 11, 2):
+        tem_data = (read_byte[i] << 8 + read_byte[i+1])
         data_stack.append(tem_data)
 
-    data_stack.append(bytes_to_int(read_byte[10]))
-    data_stack.append(bytes_to_int(read_byte[11]))
+    data_stack.append((read_byte[11]))
+    data_stack.append((read_byte[12]))
+    data_stack[4] = data_stack[4]*360/8192
     
-    unit_data_stack = np.multiply(unit_array, data_stack)
-    v_fr, v_fl, v_br, v_bl, mode, error_status = unit_data_stack[0], unit_data_stack[1], unit_data_stack[2], unit_data_stack[3], unit_data_stack[4], unit_data_stack[5]
-    return v_fr, v_fl, v_br, v_bl, mode, error_status
+    return data_stack[0], data_stack[1], data_stack[2], data_stack[3], data_stack[4], data_stack[5]
