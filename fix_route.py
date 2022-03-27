@@ -78,7 +78,7 @@ def stm32_communication():
             record_end = 1
 
         if (mode == 0):
-            delta_angle = (target_angle-last_angle)+180
+            delta_angle = ((target_angle-last_angle)+180) % 360
             
             data = [target_v, delta_angle, mode, error_status]
             data_send(data, dev)
