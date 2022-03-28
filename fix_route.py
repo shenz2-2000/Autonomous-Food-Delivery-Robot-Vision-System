@@ -1,3 +1,4 @@
+from distutils.log import debug
 from time import time
 import numpy as np
 import threading
@@ -23,7 +24,6 @@ def record_input(cur_state, x_stack, y_stack, spd_stack, spd, ang, t_interval = 
     
 def record_output(x_stack, y_stack, spd_stack, cur_point):
     
-    
     length = len(x_stack)
     step_size = 1
     now_run, nxt_run = cur_point, cur_point + 1
@@ -32,8 +32,6 @@ def record_output(x_stack, y_stack, spd_stack, cur_point):
     ins_ang = np.arctan2(y_direc, x_direc)/np.pi*180 # radius, should change to degree
     ins_ang += 180
     ins_spd = spd_stack[now_run]    #The speed will cause problem if there is a 0
-
-    ins_ang = 169
 
     global target_v, target_angle
     target_v, target_angle = ins_spd, ins_ang
@@ -73,7 +71,6 @@ def stm32_communication():
             truth_angle = cur_angle
         last_angle = cur_angle
         
-
         if (mode == 2):
             if (record_end == 1):
                 record_end, cur_point = 0, 0
@@ -84,8 +81,17 @@ def stm32_communication():
             record_end = 1
 
         if True: #(mode == 0):           #THIS IS CHANGED FOR TESTING 2022.03.28
-            delta_angle = (target_angle - last_angle + 180 ) % 360 #this should add a panduan!
+            #delta_angle = (target_angle - last_angle + 180 ) % 360  #this is WRONG
+            
+            delta_angle = last_angle - target_angle
+            if delta_angle > 180:
+                delta_angle = delta_angle - 360
+            elif delta_angle < -180:
+                delta_angle = delta_angle + 360
+            delta_angle += 180
             data = [target_v, delta_angle, mode, error_status]
+            global ang_out
+            ang_out = delta_angle
             data_send(data, dev)
 
 def route_decision():
@@ -94,23 +100,45 @@ def route_decision():
     '''
     global x_stack, y_stack, spd_stack, last_angle, truth_angle
     global cur_v, cur_angle, mode, error_status, target_v, target_angle, record_end, cur_point
-    #ser = lds_driver.lds_driver_init() # init for lidar   #THIS IS CHANGED FOR TESTING 2022.03.28
+    global debug_mode
+    if debug_mode == 0: 
+        ser = lds_driver.lds_driver_init() # init for lidar   
     while (1):
-        if (record_end == True):
-            # if lds_hold(ser) == 1:
-            #     print('LDS Hold Start')
-            #     target_v, target_angle = 0, last_angle
-            #     time.sleep(5)
-            #     print('LDS Hold End')
+        if (record_end == True) and (debug_mode != 2):
+            if debug_mode != 1:
+                if lds_hold(ser) == 1:
+                    print('LDS Hold Start')
+                    target_v, target_angle = 0, last_angle
+                    time.sleep(5)
+                    print('LDS Hold End')
             
             record_output(x_stack, y_stack, spd_stack, cur_point)
             cur_point += 1
             if (cur_point == len(x_stack) - 1):
-                cur_point = 0 
-
-
+                cur_point = 0
+            
         
+def monitor():
+    '''
+        This function monitors the running of the system, prints out needed elements for debugging
+        Also is for doing manual debug
+    '''
+    global x_stack, y_stack, spd_stack, last_angle, truth_angle
+    global cur_v, cur_angle, mode, error_status, target_v, target_angle, record_end, cur_point
+    global ang_out, debug_mode 
+    
+    # Debug mode 0: will run the full fix route program
+    # Debug mode 1: will run the fix route program without LDS hold
+    # Debug mode 2: will run manual route assignment, this will stop route_desicion() from changing the two target variable
+    debug_mode = 2
+    while(1):
+        if debug_mode == 2:
+            target_v = 0
+            target_angle = 0
+            
+        print('read: ', cur_v, cur_angle, ' || ', 'send: ', target_v, ang_out, ' || ', 'mode: ', mode)
 
+    
 
 def fix_route_main():
     ''' 
@@ -120,8 +148,10 @@ def fix_route_main():
     # Now comes the recording mode
     t1 = threading.Thread(target = stm32_communication)
     t2 = threading.Thread(target = route_decision)
+    t3 = threading.Thread(target = monitor)
     t1.start()
     t2.start()
+    t3.start()
     while(1):
         pass
 

@@ -31,7 +31,7 @@ def data_send(data_send, dev):
     alpha, mode, error_status = data_send[1], data_send[2], data_send[3]
     #alpha, mode, error_status = 170, data_send[2], data_send[3]
 
-    Vx, Vy = int(V * np.cos(alpha/180*np.pi)+3000), int(np.sin(alpha/180*np.pi)+3000)  #Now all V send will +3000 to ensure the send is positive, even when actual is negative 2022.03.28
+    Vx, Vy = int(V * np.cos(alpha/180*np.pi) + 3000), int(np.sin(alpha/180*np.pi) + 3000)  #Now all V send will +3000 to ensure the send is positive, even when actual is negative 2022.03.28
 
     bytes_send = []
     bytes_send.extend([Vx>>8, Vx&0xff]) #send vx
@@ -42,7 +42,7 @@ def data_send(data_send, dev):
 
     #pkg = array.array('B', bytes_send)
     num_bytes = dev.write(1,bytes_send)
-    print("nano send: ", Vx, Vy, alpha, mode, error_status)
+    #print("nano send: ", Vx, Vy, alpha, mode, error_status)
     return 
 
 def data_read(dev, len_msg = 13):
