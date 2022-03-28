@@ -29,9 +29,11 @@ def record_output(x_stack, y_stack, spd_stack, cur_point):
     now_run, nxt_run = cur_point, cur_point + 1
     x_direc = x_stack[nxt_run] - x_stack[now_run]
     y_direc = y_stack[nxt_run] - y_stack[now_run]
-    ins_ang = np.arctan2(y_direc, x_direc)/pi*180 # radius, should change to degree
+    ins_ang = np.arctan2(y_direc, x_direc)/np.pi*180 # radius, should change to degree
     ins_ang += 180
     ins_spd = spd_stack[now_run]    #The speed will cause problem if there is a 0
+
+    ins_ang = 169
 
     global target_v, target_angle
     target_v, target_angle = ins_spd, ins_ang
@@ -44,6 +46,7 @@ def lds_hold(cur_state, ser):
         if min(rge) < 1:
             return 1
     return 0
+
 # This one to put global vars
 x_stack,y_stack,spd_stack  = [],[],[]
 last_angle, truth_angle= None, None # This one used for null shift
@@ -61,12 +64,15 @@ def stm32_communication():
     dev = init_data_rw() # will be used later in the communication
     
     while(1):
+        # Mode 0: nano control; Mode 1: Remote control; Mode 2: Programming 
         cur_v, cur_angle, mode, error_status = data_read(dev)
         if (truth_angle == None):
             truth_angle = cur_angle
+            last_angle = cur_angle
         elif (last_angle-cur_angle > 0.2): # handle null shift
             truth_angle = cur_angle
         last_angle = cur_angle
+        
 
         if (mode == 2):
             if (record_end == 1):
@@ -77,9 +83,8 @@ def stm32_communication():
         elif (mode == 0):
             record_end = 1
 
-        if (mode == 0):
-            delta_angle = ((target_angle-last_angle)+180) % 360
-            
+        if True: #(mode == 0):           #THIS IS CHANGED FOR TESTING 2022.03.28
+            delta_angle = (target_angle - last_angle + 180 ) % 360 #this should add a panduan!
             data = [target_v, delta_angle, mode, error_status]
             data_send(data, dev)
 
@@ -89,14 +94,14 @@ def route_decision():
     '''
     global x_stack, y_stack, spd_stack, last_angle, truth_angle
     global cur_v, cur_angle, mode, error_status, target_v, target_angle, record_end, cur_point
-    ser = lds_driver.lds_driver_init() # init for lidar
+    #ser = lds_driver.lds_driver_init() # init for lidar   #THIS IS CHANGED FOR TESTING 2022.03.28
     while (1):
-        if (record_end = True):
-            if lds_hold(ser) == 1:
-                print('LDS Hold Start')
-                target_v, target_angle = 0, last_angle
-                time.sleep(5)
-                print('LDS Hold End')
+        if (record_end == True):
+            # if lds_hold(ser) == 1:
+            #     print('LDS Hold Start')
+            #     target_v, target_angle = 0, last_angle
+            #     time.sleep(5)
+            #     print('LDS Hold End')
             
             record_output(x_stack, y_stack, spd_stack, cur_point)
             cur_point += 1
