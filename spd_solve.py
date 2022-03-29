@@ -45,10 +45,9 @@ def get_chasis_spd(v_fr, v_fl, v_br, v_bl): # it should actually be bl,br, just 
     w = sum[2] / num_of_ave /  w_to_v_ratio
     spd = np.sqrt(v_x**2 + v_y**2)
     # print(v_x,v_y,w)
-    return spd
+    #return spd
     # This fucking spd should be the absolute speed if work as expected, mm/s
-    #return v_x,v_y,w 
-    
+    return spd
     
 #get_chasis_spd(0,7.53138075,0,-7.53138075)
     

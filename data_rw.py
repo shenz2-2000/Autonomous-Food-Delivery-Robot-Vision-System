@@ -60,4 +60,5 @@ def data_read(dev, len_msg = 13):
     data_stack.append((read_byte[12]))
     data_stack[4] = data_stack[4]*360/8192
     #print("nano_read: ", data_stack)
+    #print(get_chasis_spd(data_stack[0]-2500, data_stack[1]-2500, data_stack[2]-2500, data_stack[3]-2500))
     return get_chasis_spd(data_stack[0]-2500, data_stack[1]-2500, data_stack[2]-2500, data_stack[3]-2500), data_stack[4], data_stack[5], data_stack[6]

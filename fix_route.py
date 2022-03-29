@@ -47,8 +47,8 @@ def lds_hold(cur_state, ser):
 
 # This one to put global vars
 x_stack,y_stack,spd_stack  = [],[],[]
-last_angle, truth_angle= None, None # This one used for null shift
-cur_v, cur_angle, mode, error_status = None, None, None, None
+last_angle, truth_angle= 0, 0 # This one used for null shift
+cur_v, cur_angle, mode, error_status = 0, 0, 0, 0
 target_v, target_angle, cur_point = 0, 0, 0
 record_end = False # Indicating record ends or not
 
@@ -59,18 +59,24 @@ def stm32_communication():
     '''
     global x_stack, y_stack, spd_stack, last_angle, truth_angle
     global cur_v, cur_angle, mode, error_status, target_v, target_angle, record_end, cur_point
+    global ang_out, delta_angle_manual
     dev = init_data_rw() # will be used later in the communication
-    
+    ang_out = 0
+    delta_angle_manual = 0
+
+    cur_v, cur_angle, mode, error_status = data_read(dev)
+    if debug_mode == 2:
+        target_angle = cur_angle
     while(1):
         # Mode 0: nano control; Mode 1: Remote control; Mode 2: Programming 
         cur_v, cur_angle, mode, error_status = data_read(dev)
-        if (truth_angle == None):
+
+        if (truth_angle == 0):
             truth_angle = cur_angle
             last_angle = cur_angle
         elif (last_angle-cur_angle > 0.2): # handle null shift
             truth_angle = cur_angle
         last_angle = cur_angle
-        
         if (mode == 2):
             if (record_end == 1):
                 record_end, cur_point = 0, 0
@@ -81,8 +87,6 @@ def stm32_communication():
             record_end = 1
 
         if True: #(mode == 0):           #THIS IS CHANGED FOR TESTING 2022.03.28
-            #delta_angle = (target_angle - last_angle + 180 ) % 360  #this is WRONG
-            
             delta_angle = last_angle - target_angle
             if delta_angle > 180:
                 delta_angle = delta_angle - 360
@@ -90,10 +94,14 @@ def stm32_communication():
                 delta_angle = delta_angle + 360
 
             #The plus 180 work is moved to data_rw, here is only [-180,180] indicating the desired degree
-            data = [target_v, delta_angle, mode, error_status]
-            global ang_out
-            ang_out = delta_angle
-            data_send(data, dev)
+            if debug_mode != 2:
+                data = [target_v, delta_angle, mode, error_status]
+                ang_out = delta_angle
+                data_send(data, dev)
+            elif debug_mode == 2:
+                data = [target_v, delta_angle_manual, mode, error_status]
+                ang_out = delta_angle_manual
+                data_send(data, dev)
 
 def route_decision():
     '''
@@ -105,7 +113,7 @@ def route_decision():
     if debug_mode == 0:  #Onlt init if lds_fix_route is chosen 
         ser = lds_driver.lds_driver_init()   
     while (1):
-        if (record_end == True) and (debug_mode != 2):  #output fix route when debug mode is not manual
+        if (record_end == True) and (debug_mode != 2) and (debug_mode != 3):  #output fix route when debug mode is not manual
             if debug_mode == 0: 
                 if lds_hold(ser) == 1:
                     print('LDS Hold Start')
@@ -126,38 +134,42 @@ def monitor():
     '''
     global x_stack, y_stack, spd_stack, last_angle, truth_angle
     global cur_v, cur_angle, mode, error_status, target_v, target_angle, record_end, cur_point
-    global ang_out, debug_mode
-    
-    # Debug mode 0: will run the full fix route program
-    # Debug mode 1: will run the fix route program without LDS
-    # Debug mode 2: will run manual route assignment, this will stop route_desicion() from changing the two target variables
-    ## Change the four varible below to perform manual debugging
+    global ang_out, debug_mode, delta_angle_manual
+    ang_out = 0
+    # Mode 0: nano control
+    # Mode 1: Remote control
+    # Mode 2: Programming 
+    # Debug mode 0: fix route program
+    # Debug mode 1: fix route program without LDS
+    # Debug mode 2: will run manual speed assignment, and directly assigned delta angle
+    # Debug mode 3: will run with manual speed assignment, and assigned absolute target angle
+        
     debug_mode = 2
     debug_duration_time = 10 
     manual_target_v = 100
-    manual_target_angle = 200
+    manual_target_angle = 280
+    detla_angle_manual_private = 0
     ##
     is_debug = 'inactive'
     start_time = time.time()
     while(1):
-        if debug_mode == 2:
-            if time.time() - start_time < debug_duration_time:
+        if debug_mode == 2 or debug_mode == 3:
+            if True: #time.time() - start_time < debug_duration_time:
                 target_v = manual_target_v
-                target_angle = manual_target_angle
+                if debug_mode == 2:
+                    delta_angle_manual = detla_angle_manual_private
+                elif debug_mode == 3:
+                    target_angle = manual_target_angle
                 is_debug = 'active'
             else:
                 target_v = 0
                 target_angle = last_angle
                 is_debug = 'holding'
-            
-        print('read: ', cur_v, cur_angle, '||', 'send: ', target_v, ang_out, '||', 'mode: ', mode, '||','debug: ', is_debug)
+
+        print('read: ', cur_v, cur_angle, ' || ', 'send: ', target_v, ang_out, ' || ', 'mode: ', mode, ' || ','debug: ', is_debug)
+        time.sleep(0.05)
         # v, angle: mm/s and degree, both absolute value, ang_out is [-180, 180]
-        # Mode 0: nano control
-        # Mode 1: Remote control
-        # Mode 2: Programming 
-        # Debug mode 0: fix route program
-        # Debug mode 1: fix route program without LDS
-        # Debug mode 2: will run manual route assignment
+
 
 def fix_route_main():
     ''' 
@@ -165,12 +177,13 @@ def fix_route_main():
         then go along this route. When detecting somebody nearby, stop.
     '''
     # Now comes the recording mode
+    t3 = threading.Thread(target = monitor)
     t1 = threading.Thread(target = stm32_communication)
     t2 = threading.Thread(target = route_decision)
-    t3 = threading.Thread(target = monitor)
+    t3.start()
     t1.start()
     t2.start()
-    t3.start()
+
     while(1):
         pass
 
