@@ -7,17 +7,18 @@ import lds_driver
 import time
 from data_rw import data_send, init_data_rw, data_read
 
-def record_input(cur_state, x_stack, y_stack, spd_stack, spd, ang, t_interval = 0.01):
+def record_input(cur_state, x_stack, y_stack, spd_stack, spd_x, spd_y, ang, t_interval = 0.01):
     if (x_stack == []):
         # Handle initial condition
         x_stack.append(0.0)
         y_stack.append(0.0)
-        spd_stack.append(0.5)  #this may cause BUG
+        spd_stack.append([0.0, 0.0])  #this may cause BUG
         
-    x_new = x_stack[-1] + spd * t_interval * np.cos(ang/180*np.pi)
-    y_new = y_stack[-1] + spd * t_interval * np.sin(ang/180*np.pi)
+    x_new = x_stack[-1] + t_interval * (np.cos(ang/180*np.pi) * spd_y + np.cos((ang-90)/180*np.pi) * spd_x)
+    y_new = y_stack[-1] + t_interval * (np.sin(ang/180*np.pi) * spd_y + np.sin((ang-90)/180*np.pi) * spd_x)
     x_stack.append(x_new)
     y_stack.append(y_new)
+    spd = np.sqrt(spd_x**2+spd_y**2)
     spd_stack.append(spd)
 
     return
@@ -48,7 +49,7 @@ def lds_hold(cur_state, ser):
 # This one to put global vars
 x_stack,y_stack,spd_stack  = [],[],[]
 last_angle, truth_angle= 0, 0 # This one used for null shift
-cur_v, cur_angle, mode, error_status = 0, 0, 0, 0
+cur_vx, cur_vy, cur_angle, mode, error_status = 0, 0, 0, 0, 0
 target_v, target_angle, cur_point = 0, 0, 0
 record_end = False # Indicating record ends or not
 
@@ -58,18 +59,18 @@ def stm32_communication():
         This code keep talking to stm32, and update info in the global vars
     '''
     global x_stack, y_stack, spd_stack, last_angle, truth_angle
-    global cur_v, cur_angle, mode, error_status, target_v, target_angle, record_end, cur_point
+    global cur_vx, cur_vy, cur_angle, mode, error_status, target_v, target_angle, record_end, cur_point
     global ang_out, delta_angle_manual
     dev = init_data_rw() # will be used later in the communication
     ang_out = 0
     delta_angle_manual = 0
 
-    cur_v, cur_angle, mode, error_status = data_read(dev)
+    cur_vx, cur_vy, cur_angle, mode, error_status = data_read(dev)
     if debug_mode == 2:
         target_angle = cur_angle
     while(1):
         # Mode 0: nano control; Mode 1: Remote control; Mode 2: Programming 
-        cur_v, cur_angle, mode, error_status = data_read(dev)
+        cur_vx, cur_vy, cur_angle, mode, error_status = data_read(dev)
 
         if (truth_angle == 0):
             truth_angle = cur_angle
@@ -82,7 +83,7 @@ def stm32_communication():
                 record_end, cur_point = 0, 0
                 x_stack, y_stack, spd_stack = [],[],[]
 
-            record_input(mode, x_stack, y_stack, spd_stack, cur_v, truth_angle)
+            record_input(mode, x_stack, y_stack, spd_stack, cur_vx, cur_vy, truth_angle)
         elif (mode == 0):
             record_end = 1
 
@@ -108,7 +109,7 @@ def route_decision():
         This function decide the route based on given info, only works when mode become 0 
     '''
     global x_stack, y_stack, spd_stack, last_angle, truth_angle
-    global cur_v, cur_angle, mode, error_status, target_v, target_angle, record_end, cur_point
+    global cur_vx, cur_vy, cur_angle, mode, error_status, target_v, target_angle, record_end, cur_point
     global debug_mode
     if debug_mode == 0:  #Onlt init if lds_fix_route is chosen 
         ser = lds_driver.lds_driver_init()   
@@ -133,7 +134,7 @@ def monitor():
         Also is for doing manual debug
     '''
     global x_stack, y_stack, spd_stack, last_angle, truth_angle
-    global cur_v, cur_angle, mode, error_status, target_v, target_angle, record_end, cur_point
+    global cur_vx, cur_vy, cur_angle, mode, error_status, target_v, target_angle, record_end, cur_point
     global ang_out, debug_mode, delta_angle_manual
     ang_out = 0
     # Mode 0: nano control
@@ -141,8 +142,8 @@ def monitor():
     # Mode 2: Programming 
     # Debug mode 0: fix route program
     # Debug mode 1: fix route program without LDS
-    # Debug mode 2: will run manual speed assignment, and directly assigned delta angle
-    # Debug mode 3: will run with manual speed assignment, and assigned absolute target angle
+    # Debug mode 2: manual speed, directly assigned delta angle
+    # Debug mode 3: manual speed, absolute target angle
         
     debug_mode = 2
     debug_duration_time = 10 
@@ -166,7 +167,7 @@ def monitor():
                 target_angle = last_angle
                 is_debug = 'holding'
 
-        print('read: ', cur_v, cur_angle, ' || ', 'send: ', target_v, ang_out, ' || ', 'mode: ', mode, ' || ','debug: ', is_debug)
+        print('read: ', cur_vx, cur_vy, cur_angle, ' || ', 'send: ', target_v, ang_out, ' || ', 'mode: ', mode, ' || ','debug: ', is_debug)
         time.sleep(0.05)
         # v, angle: mm/s and degree, both absolute value, ang_out is [-180, 180]
 

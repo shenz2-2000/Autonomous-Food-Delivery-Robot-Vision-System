@@ -47,7 +47,7 @@ def get_chasis_spd(v_fr, v_fl, v_br, v_bl): # it should actually be bl,br, just 
     # print(v_x,v_y,w)
     #return spd
     # This fucking spd should be the absolute speed if work as expected, mm/s
-    return spd
+    return v_x, v_y
     
 #get_chasis_spd(0,7.53138075,0,-7.53138075)
     
