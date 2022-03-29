@@ -88,7 +88,8 @@ def stm32_communication():
                 delta_angle = delta_angle - 360
             elif delta_angle < -180:
                 delta_angle = delta_angle + 360
-            delta_angle += 180
+
+            #The plus 180 work is moved to data_rw, here is only [-180,180] indicating the desired degree
             data = [target_v, delta_angle, mode, error_status]
             global ang_out
             ang_out = delta_angle
@@ -101,18 +102,18 @@ def route_decision():
     global x_stack, y_stack, spd_stack, last_angle, truth_angle
     global cur_v, cur_angle, mode, error_status, target_v, target_angle, record_end, cur_point
     global debug_mode
-    if debug_mode == 0: 
-        ser = lds_driver.lds_driver_init() # init for lidar   
+    if debug_mode == 0:  #Onlt init if lds_fix_route is chosen 
+        ser = lds_driver.lds_driver_init()   
     while (1):
-        if (record_end == True) and (debug_mode != 2):
-            if debug_mode != 1:
+        if (record_end == True) and (debug_mode != 2):  #output fix route when debug mode is not manual
+            if debug_mode == 0: 
                 if lds_hold(ser) == 1:
                     print('LDS Hold Start')
                     target_v, target_angle = 0, last_angle
                     time.sleep(5)
                     print('LDS Hold End')
             
-            record_output(x_stack, y_stack, spd_stack, cur_point)
+            record_output(x_stack, y_stack, spd_stack, cur_point) # If debug_mode == 1, then lds will be skipped and fixroute will run without lds
             cur_point += 1
             if (cur_point == len(x_stack) - 1):
                 cur_point = 0
@@ -125,20 +126,38 @@ def monitor():
     '''
     global x_stack, y_stack, spd_stack, last_angle, truth_angle
     global cur_v, cur_angle, mode, error_status, target_v, target_angle, record_end, cur_point
-    global ang_out, debug_mode 
+    global ang_out, debug_mode
     
     # Debug mode 0: will run the full fix route program
-    # Debug mode 1: will run the fix route program without LDS hold
-    # Debug mode 2: will run manual route assignment, this will stop route_desicion() from changing the two target variable
+    # Debug mode 1: will run the fix route program without LDS
+    # Debug mode 2: will run manual route assignment, this will stop route_desicion() from changing the two target variables
+    ## Change the four varible below to perform manual debugging
     debug_mode = 2
+    debug_duration_time = 10 
+    manual_target_v = 100
+    manual_target_angle = 200
+    ##
+    is_debug = 'inactive'
+    start_time = time.time()
     while(1):
         if debug_mode == 2:
-            target_v = 0
-            target_angle = 0
+            if time.time() - start_time < debug_duration_time:
+                target_v = manual_target_v
+                target_angle = manual_target_angle
+                is_debug = 'active'
+            else:
+                target_v = 0
+                target_angle = last_angle
+                is_debug = 'holding'
             
-        print('read: ', cur_v, cur_angle, ' || ', 'send: ', target_v, ang_out, ' || ', 'mode: ', mode)
-
-    
+        print('read: ', cur_v, cur_angle, '||', 'send: ', target_v, ang_out, '||', 'mode: ', mode, '||','debug: ', is_debug)
+        # v, angle: mm/s and degree, both absolute value, ang_out is [-180, 180]
+        # Mode 0: nano control
+        # Mode 1: Remote control
+        # Mode 2: Programming 
+        # Debug mode 0: fix route program
+        # Debug mode 1: fix route program without LDS
+        # Debug mode 2: will run manual route assignment
 
 def fix_route_main():
     ''' 

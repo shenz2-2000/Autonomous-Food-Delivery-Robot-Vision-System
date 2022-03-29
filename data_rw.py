@@ -28,8 +28,7 @@ def data_send(data_send, dev):
     dev.reset()
     import numpy as np
     V = data_send[0]
-    alpha, mode, error_status = data_send[1], data_send[2], data_send[3]
-    #alpha, mode, error_status = 170, data_send[2], data_send[3]
+    alpha, mode, error_status = data_send[1] + 180, data_send[2], data_send[3]
 
     Vx, Vy = int(V * np.cos(alpha/180*np.pi) + 3000), int(np.sin(alpha/180*np.pi) + 3000)  #Now all V send will +3000 to ensure the send is positive, even when actual is negative 2022.03.28
 
