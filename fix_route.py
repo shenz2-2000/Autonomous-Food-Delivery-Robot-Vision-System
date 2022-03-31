@@ -7,20 +7,20 @@ import lds_driver
 import time
 from data_rw import data_send, init_data_rw, data_read
 
-def record_input(cur_state, x_stack, y_stack, spd_stack, spd_x, spd_y, ang, t_interval = 0.01):
+def record_input(cur_state, x_stack, y_stack, spd_stack, spd_x, spd_y, ang, t_interval = 100):
     if (x_stack == []):
         # Handle initial condition
         x_stack.append(0.0)
         y_stack.append(0.0)
-        spd_stack.append([0.0, 0.0])  #this may cause BUG
+        spd_stack.append(0.0)  #this may cause BUG
         
     x_new = x_stack[-1] + t_interval * (np.cos(ang/180*np.pi) * spd_y + np.cos((ang-90)/180*np.pi) * spd_x)
     y_new = y_stack[-1] + t_interval * (np.sin(ang/180*np.pi) * spd_y + np.sin((ang-90)/180*np.pi) * spd_x)
     x_stack.append(x_new)
     y_stack.append(y_new)
     spd = np.sqrt(spd_x**2+spd_y**2)
-    spd_stack.append(spd)
-
+    spd_stack.append(float(spd))
+    #print('In ',x_new, y_new, float(spd))
     return
     
 def record_output(x_stack, y_stack, spd_stack, cur_point):
@@ -33,7 +33,7 @@ def record_output(x_stack, y_stack, spd_stack, cur_point):
     ins_ang = np.arctan2(y_direc, x_direc)/np.pi*180 # radius, should change to degree
     ins_ang += 180
     ins_spd = spd_stack[now_run]    #The speed will cause problem if there is a 0
-
+    #print('Out ', x_direc,y_direc,ins_spd, ins_ang)
     global target_v, target_angle
     target_v, target_angle = ins_spd, ins_ang
 
@@ -49,7 +49,7 @@ def lds_hold(cur_state, ser):
 # This one to put global vars
 x_stack,y_stack,spd_stack  = [],[],[]
 last_angle, truth_angle= 0, 0 # This one used for null shift
-cur_vx, cur_vy, cur_angle, mode, error_status = 0, 0, 0, 0, 0
+cur_vx, cur_vy, cur_angle, mode, error_status = 0, 0, 0, 1, 0
 target_v, target_angle, cur_point = 0, 0, 0
 record_end = False # Indicating record ends or not
 
@@ -64,10 +64,12 @@ def stm32_communication():
     dev = init_data_rw() # will be used later in the communication
     ang_out = 0
     delta_angle_manual = 0
+    delta_angle, last_angle, cur_angle = 0, 0, 0
 
     cur_vx, cur_vy, cur_angle, mode, error_status = data_read(dev)
     if debug_mode == 2:
         target_angle = cur_angle
+
     while(1):
         # Mode 0: nano control; Mode 1: Remote control; Mode 2: Programming 
         cur_vx, cur_vy, cur_angle, mode, error_status = data_read(dev)
@@ -88,17 +90,23 @@ def stm32_communication():
             record_end = 1
 
         if True: #(mode == 0):           #THIS IS CHANGED FOR TESTING 2022.03.28
-            delta_angle = last_angle - target_angle
+            if target_angle == 180:
+                target_angle = last_angle
+            delta_angle =  - last_angle + target_angle
             if delta_angle > 180:
                 delta_angle = delta_angle - 360
             elif delta_angle < -180:
                 delta_angle = delta_angle + 360
 
+            if mode != 0:
+                delta_angle = 0
+
             #The plus 180 work is moved to data_rw, here is only [-180,180] indicating the desired degree
             if debug_mode != 2:
                 data = [target_v, delta_angle, mode, error_status]
+                #print(last_angle, target_angle, delta_angle, mode)
                 ang_out = delta_angle
-                data_send(data, dev)
+                #data_send(data, dev)
             elif debug_mode == 2:
                 data = [target_v, delta_angle_manual, mode, error_status]
                 ang_out = delta_angle_manual
@@ -145,10 +153,10 @@ def monitor():
     # Debug mode 2: manual speed, directly assigned delta angle
     # Debug mode 3: manual speed, absolute target angle
         
-    debug_mode = 2
+    debug_mode = 1
     debug_duration_time = 10 
-    manual_target_v = 100
-    manual_target_angle = 280
+    manual_target_v = 0
+    manual_target_angle = 140
     detla_angle_manual_private = 0
     ##
     is_debug = 'inactive'
