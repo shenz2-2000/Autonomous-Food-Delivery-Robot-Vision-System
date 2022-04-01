@@ -30,7 +30,7 @@ def data_send(data_send, dev):
     V = data_send[0]
     alpha, mode, error_status = data_send[1] + 180, data_send[2], data_send[3]
 
-    Vx, Vy = 0, int(V) + 3000 #Now all V send will +3000 to ensure the send is positive, even when actual is negative 2022.03.28
+    Vx, Vy = 3000, int(V) + 3000 #Now all V send will +3000 to ensure the send is positive, even when actual is negative 2022.03.28
 
     bytes_send = []
     bytes_send.extend([Vx>>8, Vx&0xff]) #send vx
@@ -61,4 +61,5 @@ def data_read(dev, len_msg = 13):
     data_stack[4] = data_stack[4]*360/8192
     #print("nano_read: ", data_stack)
     #print(get_chasis_spd(data_stack[0]-2500, data_stack[1]-2500, data_stack[2]-2500, data_stack[3]-2500))
-    return get_chasis_spd(data_stack[0]-2500, data_stack[1]-2500, data_stack[2]-2500, data_stack[3]-2500), data_stack[4], data_stack[5], data_stack[6]
+    vx, vy = get_chasis_spd(data_stack[0]-2500, data_stack[1]-2500, data_stack[2]-2500, data_stack[3]-2500)
+    return vx, vy, data_stack[4], data_stack[5], data_stack[6]
