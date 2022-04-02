@@ -5,7 +5,7 @@ import threading
 from matplotlib import pyplot as plt
 import lds_driver
 import time
-from data_rw import data_send, init_data_rw, data_read
+from data_rw import data_send, init_data_rw, data_read, data_read_test
 
 # This one to put global vars
 x_stack,y_stack  = [],[]
@@ -13,6 +13,7 @@ cur_x_pos, cur_y_pos = [], []
 last_angle, truth_angle= 0, 0 # This one used for null shift
 cur_vx, cur_vy, cur_angle, mode, error_status = 0, 0, 0, 1, 0
 target_v, target_angle, cur_point = 0, 0, 0
+delta_angle_manual = 0 
 record_end = False # Indicating record ends or not
 
 def record_input(cur_state, x_stack, y_stack, spd_x, spd_y, ang, t_interval = 1):
@@ -26,7 +27,7 @@ def record_input(cur_state, x_stack, y_stack, spd_x, spd_y, ang, t_interval = 1)
     x_stack.append(x_new)
     y_stack.append(y_new)
     spd = np.sqrt(spd_x**2+spd_y**2)
-    print('In ',x_new, y_new, float(spd))
+    #print('In ',x_new, y_new, float(spd))
     return
     
 def record_output(x_stack, y_stack, cur_point, ins_spd=100):
@@ -35,12 +36,12 @@ def record_output(x_stack, y_stack, cur_point, ins_spd=100):
     y_direc = y_stack[cur_point] - cur_y_pos[-1]
     ins_ang = np.arctan2(y_direc, x_direc)/np.pi*180 # radius, should change to degree
     ins_ang += 360 * (ins_ang<0)
-    # print('Out ', x_direc,y_direc,ins_spd, ins_ang)
+    #print('Out ', x_direc,y_direc,ins_spd, ins_ang)
     global target_v, target_angle
     target_v, target_angle = ins_spd, ins_ang
 
-
-    if (abs(x_direc)<2 and abs(y_direc)<2):
+    #print("the nxt point we gonna go", x_stack[cur_point], y_stack[cur_point])
+    if (abs(x_direc)<150 and abs(y_direc)<150):
         return 1
     
     return 0
@@ -62,19 +63,20 @@ def stm32_communication():
     global x_stack, y_stack, last_angle, truth_angle
     global cur_vx, cur_vy, cur_angle, mode, error_status, target_v, target_angle, record_end, cur_point
     global ang_out, delta_angle_manual, cur_x_pos, cur_y_pos
-    dev = init_data_rw() # will be used later in the communication
+    #dev =  init_data_rw()# will be used later in the communication
     ang_out = 0
-    delta_angle_manual = 0
+    # delta_angle_manual = 0
     delta_angle, last_angle, cur_angle = 0, 0, 0
     pre_mode = None
-    cur_vx, cur_vy, cur_angle, mode, error_status = data_read(dev)
+    #cur_vx, cur_vy, cur_angle, mode, error_status = data_read(dev)
+
     if debug_mode == 2:
         target_angle = cur_angle
     while(1):
-        
+        t = time.time()
         # Mode 0: nano control; Mode 1: Remote control; Mode 2: Programming 
-        cur_vx, cur_vy, cur_angle, mode, error_status = data_read(dev)
-
+        #cur_vx, cur_vy, cur_angle, mode, error_status = data_read(dev)
+        #cur_vx, cur_vy, cur_angle, mode, error_status = data_read_test(dev,t)
         if (truth_angle == 0):
             truth_angle = cur_angle
             last_angle = cur_angle
@@ -114,10 +116,10 @@ def stm32_communication():
                 if (target_angle == 0):  # Fix the cold start bug
                     continue
                 if (mode == 0):
-                    print("data", data)
-                    print("fucking output angle", last_angle, target_angle, delta_angle, mode)
-                ang_out = delta_angle
-                data_send(data, dev)
+                    #print("data", data)
+                    #print("fucking output angle", last_angle, target_angle, delta_angle, mode)
+                    ang_out = delta_angle
+                    data_send(data, dev)
             elif debug_mode == 2:
                 data = [target_v, delta_angle_manual, mode, error_status]
                 ang_out = delta_angle_manual
@@ -130,6 +132,8 @@ def route_decision():
     global x_stack, y_stack, last_angle, truth_angle
     global cur_vx, cur_vy, cur_angle, mode, error_status, target_v, target_angle, record_end, cur_point
     global debug_mode
+
+    
     if debug_mode == 0:  #Onlt init if lds_fix_route is chosen 
         ser = lds_driver.lds_driver_init()   
     while (1):
@@ -142,9 +146,9 @@ def route_decision():
                     print('LDS Hold End')
             
             if (record_output(x_stack, y_stack, cur_point)==1):  # To check whether we get the point and move on to the next point
-                cur_point += 1
+                cur_point += 5
 
-            if (cur_point == len(x_stack) - 1):
+            if (cur_point >= len(x_stack) - 1):
                 cur_point = 0
             
         
@@ -156,6 +160,7 @@ def monitor():
     global x_stack, y_stack, last_angle, truth_angle
     global cur_vx, cur_vy, cur_angle, mode, error_status, target_v, target_angle, record_end, cur_point
     global ang_out, debug_mode, delta_angle_manual
+    
     ang_out = 0
     # Mode 0: nano control
     # Mode 1: Remote control
@@ -167,13 +172,17 @@ def monitor():
         
     debug_mode = 2
     debug_duration_time = 10 
-    manual_target_v = 100
-    manual_target_angle = 0
-    detla_angle_manual_private = 0
+    manual_target_v = 0
+    manual_target_angle = 115
+    detla_angle_manual_private = 5
     ##
     is_debug = 'inactive'
     start_time = time.time()
     while(1):
+        # if debug_mode == 2:
+        #     data = [target_v, delta_angle_manual, mode, error_status]
+        #     # ang_out = delta_angle_manual
+        #     data_send(data, dev)
         if debug_mode == 2 or debug_mode == 3:
             if True: #time.time() - start_time < debug_duration_time:
                 target_v = manual_target_v
@@ -188,9 +197,17 @@ def monitor():
                 is_debug = 'holding'
 
         #print('read: ', cur_vx, cur_vy, cur_angle, ' || ', 'send: ', target_v, ang_out, ' || ', 'mode: ', mode, ' || ','debug: ', is_debug)
-        time.sleep(0.05)
+        #print('running')
+        #time.sleep(0.05)
         # v, angle: mm/s and degree, both absolute value, ang_out is [-180, 180]
 
+
+def test_thread():
+    dev =  init_data_rw()
+    while 1:
+        t = time.time()
+        cur_vx, cur_vy, cur_angle, mode, error_status = data_read_test(dev,t)
+        #print('running')
 
 def fix_route_main():
     ''' 
@@ -198,12 +215,14 @@ def fix_route_main():
         then go along this route. When detecting somebody nearby, stop.
     '''
     # Now comes the recording mode
-    t3 = threading.Thread(target = monitor)
-    t1 = threading.Thread(target = stm32_communication)
-    t2 = threading.Thread(target = route_decision)
-    t3.start()
-    t1.start()
-    t2.start()
+    #t3 = threading.Thread(target = monitor)
+    #t1 = threading.Thread(target = stm32_communication)
+    #t2 = threading.Thread(target = route_decision)
+    t4 = threading.Thread(target = test_thread)
+    t4.start()
+    #t3.start()
+    #t1.start()
+    #t2.start()
 
     while(1):
         pass

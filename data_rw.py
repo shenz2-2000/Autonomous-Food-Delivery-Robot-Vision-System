@@ -2,7 +2,7 @@ import usb.core
 import usb.util
 from spd_solve import get_chasis_spd
 import numpy as np
-
+import time
 def int_to_bytes(x: int) -> bytes:
     return x.to_bytes((x.bit_length() + 7) // 8, 'big')
 
@@ -59,7 +59,23 @@ def data_read(dev, len_msg = 13):
     data_stack.append((read_byte[11]))
     data_stack.append((read_byte[12]))
     data_stack[4] = data_stack[4]*360/8192
-    #print("nano_read: ", data_stack)
+    print("nano_read: ", data_stack)
     #print(get_chasis_spd(data_stack[0]-2500, data_stack[1]-2500, data_stack[2]-2500, data_stack[3]-2500))
     vx, vy = get_chasis_spd(data_stack[0]-2500, data_stack[1]-2500, data_stack[2]-2500, data_stack[3]-2500)
     return vx, vy, data_stack[4], data_stack[5], data_stack[6]
+
+def data_read_test(dev, t, len_msg = 5):
+    dev.reset()
+    read_byte = dev.read(0x81, len_msg, 100)
+    data_stack = []
+    # for i in range(1, 11, 2):
+    #     tem_data = (int(read_byte[i] << 8) + int(read_byte[i+1]))
+    #     data_stack.append(tem_data)
+    # data_stack.append((read_byte[11]))
+    # data_stack.append((read_byte[12]))
+    # data_stack[4] = data_stack[4]*360/8192
+    for i in range(1, 5, 2):
+        tem_data = (int(read_byte[i] << 8) + int(read_byte[i+1]))
+        data_stack.append(tem_data)
+    print("nano_read: ", data_stack, 'time:', time.time() - t)
+    return 0,0,0,0,0
