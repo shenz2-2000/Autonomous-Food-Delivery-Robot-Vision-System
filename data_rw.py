@@ -21,7 +21,7 @@ def init_data_rw():
     return dev
 
 def data_send(data_send, dev):
-    #data_send should be [v, alpha, mode, error_status]
+    #data_send should be [vy, alpha, mode, error_status]
     
     #send data to stm32
     # data send is in v>>8, v, alpha/360*8192>>8, alpha/360*8192, mode, error
@@ -46,8 +46,6 @@ def data_send(data_send, dev):
 
 def data_read(dev, len_msg = 13):
     dev.reset()
-    
-    
     #read data from stm32
     # data_stack format [V_FR, V_FL, V_BL, V_BR, alpha, mode, error]  #Now all V received will -2500 to have both positive and negative 2022.03.28
     read_byte = dev.read(0x81, len_msg, 100)
@@ -59,7 +57,7 @@ def data_read(dev, len_msg = 13):
     data_stack.append((read_byte[11]))
     data_stack.append((read_byte[12]))
     data_stack[4] = data_stack[4]*360/8192
-    print("nano_read: ", data_stack)
+    #print("nano_read: ", data_stack)
     #print(get_chasis_spd(data_stack[0]-2500, data_stack[1]-2500, data_stack[2]-2500, data_stack[3]-2500))
     vx, vy = get_chasis_spd(data_stack[0]-2500, data_stack[1]-2500, data_stack[2]-2500, data_stack[3]-2500)
     return vx, vy, data_stack[4], data_stack[5], data_stack[6]
@@ -77,5 +75,5 @@ def data_read_test(dev, t, len_msg = 5):
     for i in range(1, 5, 2):
         tem_data = (int(read_byte[i] << 8) + int(read_byte[i+1]))
         data_stack.append(tem_data)
-    print("nano_read: ", data_stack, 'time:', time.time() - t)
+    #print("nano_read: ", data_stack, 'time:', time.time() - t)
     return 0,0,0,0,0
