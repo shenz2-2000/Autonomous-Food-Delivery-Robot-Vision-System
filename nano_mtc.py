@@ -1,4 +1,4 @@
-from multiprocessing import Process, Pipe
+from multiprocessing import Process, Pipe, RLock
 import time
 import lds_driver
 from data_rw import data_send, init_data_rw, data_read, data_read_test
@@ -10,7 +10,7 @@ def lds_hold(cur_state, ser):
             return 1
     return 0
 
-def route_decision(lds_pipe, debug_mode):
+def lds_decision(lds_pipe, debug_mode, lock):
     '''
     Read from LDS and send hold status to other core via lds_pipe
     '''
@@ -32,29 +32,42 @@ def route_decision(lds_pipe, debug_mode):
         while 1:
             lds_pipe.send(0)
 
-def status_read(dev, read_pipe):
+def fix_rt(dev, read_pipe, lock):
     '''
     Read from STM and send data to other core via read_pip
     '''
+    vx, vy, ang, mode, error = 0, 0, 0, 0, 0
     while 1:
-        vx, vy, ang, mode, error = data_read(dev)
-        data = [vx, vy, ang, mode, error]
-        read_pipe.send(data) 
+        t = time.time()
+        lock.acquire()
+        #print('read running')
+        #vx, vy, ang, mode, error = data_read(dev)
+        #vx, vy, ang, mode, error = data_read_test(dev, t) #Read Data
+        lock.release() 
+
+
+
     
-def ins_send(dev, lds_pipe, read_pipe):
+def in_out(dev, lds_pipe, read_pipe, lock):
     '''
     Responsible for getting the info from STM and LDS, form instruction,
     and send instruction to STM
     '''
     while 1:
         is_hold = lds_pipe.recv() #
-        data = read_pipe.recv() #You can access the data from stm32 with this
+ #You can access the data from stm32 with this
         to_send = [0, 0, 0, 0]
         if is_hold:
             to_send = [1, 1, 1, 1]
-        data_send(to_send, dev)
-        #To Monitor:
-        print(data)
+
+        #lock.acquire()
+        #vx, vy, ang, mode, error = data_read(dev)
+        vx, vy, ang, mode, error = data_read_test(dev) #Read Data
+        data_send(to_send, dev)  #Send Data
+        #lock.release() 
+        
+        data = [vx, vy, ang, mode, error]
+        read_pipe.send(data)
         #
         
             
@@ -62,14 +75,15 @@ def ins_send(dev, lds_pipe, read_pipe):
 if __name__ == '__main__':
     # debug_mode 0 will enable LDS
     debug_mode = 1
-    
+
+    lock = RLock()
     (lds_in, lds_out) = Pipe()
     (read_in, read_out) = Pipe()
     dev = init_data_rw()
     
-    p1 = Process(target = status_read, args = (dev, read_in,))
-    p3 = Process(target = route_decision, args = (lds_in, debug_mode,))
-    p2 = Process(target = ins_send, args = (dev, lds_out, read_out,)) 
+    p1 = Process(target = fix_rt, args = (dev, read_out, lock))
+    p3 = Process(target = lds_decision, args = (lds_in, debug_mode, lock))
+    p2 = Process(target = in_out, args = (dev, lds_out, read_in, lock)) 
     p1.start()
     p2.start()
     p3.start()
