@@ -5,34 +5,46 @@ import numpy as np
 from data_rw import data_send, init_data_rw, data_read, data_read_test
 from multiprocessing import Value, Array
 
-def lds_hold(cur_state, ser):
-    if cur_state == 0:
-        rge = lds_driver.lds_poll(ser)
-        if min(rge) < 1:
-            return 1
+def lds_hold(ser):
+    # if cur_state == 0:
+    rge = lds_driver.lds_poll(ser)
+    # rge(find(rge==0))=[]
+    b = np.unique(rge)
+    b = b[b != 0]
+    if min(b) < 0.1:
+        print(min(b))
+        return 1
     return 0
 
 def lds_decision(is_hold, debug_mode):
     '''
     Read from LDS and send hold status to other core
     '''
+    #print("STUPID")
     if debug_mode == 0:
+        print('zs')
         ser = lds_driver.lds_driver_init()
+        print("init")
+        rge = lds_driver.lds_poll(ser)
+        print("poll success")
+        trigger_time = 0
         while 1:
-            trigger_time = 0
+
             
+            # print(lds_hold(ser))
             old_time = time.time()
             if lds_hold(ser) == 1:  #If lds is triggered, update trigger time, enable is_hold
                 trigger_time = old_time
                 print('LDS Hold Triggered')
                 is_hold.value = 1
-            elif time.time() - trigger_time < 5: #If lds not triggered, but still in 5 second interval, enable is_hold
-                print('LDS Hold Triggered')
+            elif time.time() - trigger_time < 2: #If lds not triggered, but still in 5 second interval, enable is_hold
+                print('LDS Hold Triggered By Time')
                 is_hold.value = 1
             else:
                 is_hold.value = 0
     else:   # If debug_mode is not 0, constantly set is_hold to 0
         while 1:
+            #print("zs2")
             is_hold.value = 0
 
     
@@ -84,16 +96,16 @@ def route_decision(dev, debug_mode, is_hold, target_v, target_angle, angle_stack
                     get_ang = 0
                     old_time = time.time()
             if is_done:
-                print('DONE', cur_point, distance_stack[cur_point], angle_stack[cur_point])
-                print("dis:", distance_stack[0:10])
-                print("ang:", angle_stack[0:10])
+                #print('DONE', cur_point, distance_stack[cur_point], angle_stack[cur_point])
+                #print("dis:", distance_stack[0:10])
+                #print("ang:", angle_stack[0:10])
                 cur_point += 1
                 is_done = 0
             if type_stack[cur_point] == 0:
                 cur_point = 0
-            # if is_hold:
-            #     ins_spd = 0
-            #     ins_ang = cur_angle.value
+            if is_hold.value:
+                ins_spd = 0
+                ins_ang = cur_angle.value
             target_angle.value, target_v.value = ins_ang, ins_spd
             #print(ins_ang, tar_ang, type_stack[cur_point], cur_angle.value)
 
@@ -104,7 +116,6 @@ def stm32_communication(dev, debug_mode, is_hold, target_v, target_angle, angle_
     '''
     Responsible for getting the info from STM and LDS, form instruction,
     and send instruction to STM
-
     %para:
         target_v, target_angle: represent the target v and angle we wanna acheive
         x_stack, y_stack: record the track of robot
@@ -183,7 +194,7 @@ if __name__ == '__main__':
     # debug_mode 0 will enable LDS
     # debug_mode 1 will disable LDS
     # debug mode 2 will fix an angle and let the velocity keeps being zero
-    debug_mode = 1
+    debug_mode = 0
 
     # Put all the shared memory variable here.. Plz keep comments well maintained
     is_hold = Value('i', 0)                 # indicate whether the lds is hold
@@ -207,4 +218,3 @@ if __name__ == '__main__':
     p1.start()
     p2.start()
     p3.start()
-    

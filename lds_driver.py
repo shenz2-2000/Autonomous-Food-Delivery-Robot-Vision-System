@@ -15,7 +15,7 @@ def lds_poll(ser):
     res = [-1] * 360
     # print(raw_bytes)
     start_count, good_sets, motor_speed = 0, 0, 0
-    while (~got_scan):
+    while (got_scan==False):
         raw_bytes[start_count] = bytes_to_int(ser.read(1))
         # print(ser.read(1))
         # if (raw_bytes[start_count] == b'\xfa'):
@@ -23,10 +23,10 @@ def lds_poll(ser):
         if (start_count == 0):
             if (raw_bytes[start_count] == bytes_to_int(b'\xfa')):
                 start_count = 1
-                # print("gdl")
+                #print("gdl")
         elif (start_count == 1):
             if (raw_bytes[start_count] == bytes_to_int(b'\xa0')):
-                # print("gdl2")
+                #print("gdl2")
                 start_count = 0
                 got_scan = True
                 data = ser.read(2518)
@@ -69,10 +69,11 @@ def lds_driver_test():
     port = '/dev/ttyUSB0'
     baud_rate = 230400
     ser = serial.Serial(port, baud_rate)
-
     while (1):
+        #print(ser.read(1))
         res = lds_poll(ser)
-        print(res[100])
+        #print("orz")
+        #print(res)
     return
 
 #lds_driver_test()
