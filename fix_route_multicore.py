@@ -12,7 +12,7 @@ def lds_hold(ser):
     b = np.unique(rge)
     b = b[b != 0]
     if min(b) < 0.1:
-        print(min(b))
+        #print(min(b))
         return 1
     return 0
 
@@ -22,11 +22,11 @@ def lds_decision(is_hold, debug_mode):
     '''
     #print("STUPID")
     if debug_mode == 0:
-        print('zs')
+        # print('zs')
         ser = lds_driver.lds_driver_init()
-        print("init")
+        # print("init")
         rge = lds_driver.lds_poll(ser)
-        print("poll success")
+        # print("poll success")
         trigger_time = 0
         while 1:
 
@@ -49,7 +49,7 @@ def lds_decision(is_hold, debug_mode):
 
     
 def route_decision(dev, debug_mode, is_hold, target_v, target_angle, angle_stack, distance_stack, type_stack, cur_x_pos, cur_y_pos,\
-                        cur_angle, cur_vy, mode):
+                        cur_angle, cur_vy, mode, record_length):
     '''
     Read from STM and send data to other core via read_pip
     '''
@@ -61,13 +61,16 @@ def route_decision(dev, debug_mode, is_hold, target_v, target_angle, angle_stack
     while 1:
         if (mode.value == 0 and (debug_mode == 0 or debug_mode == 1)):
             tar_dis, delta_ang, tar_type = distance_stack[cur_point], angle_stack[cur_point], type_stack[cur_point]
+            if (type_stack[cur_point] == 0):
+                cur_point += 1
             # print(tar_dis,ins_spd)
             #print("dis:", distance_stack[0:10])
+            # print(tar_type)
             if tar_type == 1: #go in vy
                 if old_time == None:
                     old_time = time.time()
-                if abs(cnt) <= abs(tar_dis):
-                    #print(cnt, tar_dis)
+                if abs(cnt-tar_dis) > 10:
+                    # print(cnt, tar_dis)
                     if tar_dis >= 0:
                         ins_spd = 100
                     else: 
@@ -88,7 +91,7 @@ def route_decision(dev, debug_mode, is_hold, target_v, target_angle, angle_stack
                     tar_ang -= 360
                 elif tar_ang < 0:
                     tar_ang += 360
-                if abs(cur_angle.value - tar_ang) > 10:
+                if abs(cur_angle.value - tar_ang) > 1:
                     ins_ang = tar_ang
                     ins_spd = 0
                 else:
@@ -100,14 +103,15 @@ def route_decision(dev, debug_mode, is_hold, target_v, target_angle, angle_stack
                 #print("dis:", distance_stack[0:10])
                 #print("ang:", angle_stack[0:10])
                 cur_point += 1
+                # print("Done", cur_point, record_length.value)
                 is_done = 0
-            if type_stack[cur_point] == 0:
+            if cur_point == record_length.value:
                 cur_point = 0
             if is_hold.value:
                 ins_spd = 0
                 ins_ang = cur_angle.value
             target_angle.value, target_v.value = ins_ang, ins_spd
-            #print(ins_ang, tar_ang, type_stack[cur_point], cur_angle.value)
+            # print(ins_ang, tar_ang, type_stack[cur_point], cur_angle.value)
 
 
 
@@ -141,12 +145,15 @@ def stm32_communication(dev, debug_mode, is_hold, target_v, target_angle, angle_
             commu_cnt = 0
         # Mode 0: nano control; Mode 1: Remote control; Mode 2: Programming 
         cur_vx.value, cur_vy.value, cur_angle.value, mode.value, turning_status.value = data_read(dev)
+        # print("turning status:", turning_status.value)
+        # print(mode.value, turning_status.value, last_status)
         if (mode.value == 2):
             if (turning_status.value != last_status):
+                
                 # print("########################")
-                # print("dis:", distance_stack[0:10])
-                # print("type:", type_stack[0:10])
-                # print("ang:", angle_stack[0:10])
+                print("dis:", distance_stack[0:10])
+                print("type:", type_stack[0:10])
+                print("ang:", angle_stack[0:10])
                 # print("########################")
                 if (last_status == 2): # if last status is turning, then record the difference
                     angle_stack[record_length.value] = cur_angle.value - cnt
@@ -169,32 +176,38 @@ def stm32_communication(dev, debug_mode, is_hold, target_v, target_angle, angle_
             last_status = turning_status.value
     
         if True: #(mode == 0):           #THIS IS CHANGED FOR TESTING 2022.03.28
-            delta_angle =  - cur_angle.value + target_angle.value
-            if (abs(delta_angle) < 5):
-                delta_angle = 0
-            if delta_angle > 180:
-                delta_angle = delta_angle - 360
-            elif delta_angle < -180:
-                delta_angle = delta_angle + 360
-
-            #The plus 180 work is moved to data_rw, here is only [-180,180] indicating the desired degree
-            if debug_mode != 2:
-                data = [target_v.value, delta_angle, mode.value, 0]
-                if (mode.value == 0):
-                    #print("data", data)
-                    #print("fucking output angle", last_angle, target_angle, delta_angle, mode)
-                    data_send(data, dev)
-            elif debug_mode == 2:
-                data = [target_v.value, delta_angle_manual, mode.value, 0]
+            if (mode.value == 1 or mode.value == 2):
+                data = [0, 0, mode.value, 0]
                 data_send(data, dev)
-        
+            else:
+                delta_angle =  - cur_angle.value + target_angle.value
+                
+                if (abs(delta_angle) < 1):
+                    delta_angle = 0
+                # print("TEST!", delta_angle, cur_angle.value, target_angle.value)
+                if delta_angle > 180:
+                    delta_angle = delta_angle - 360
+                elif delta_angle < -180:
+                    delta_angle = delta_angle + 360
+
+                #The plus 180 work is moved to data_rw, here is only [-180,180] indicating the desired degree
+                if debug_mode != 2:
+                    data = [target_v.value, delta_angle, mode.value, 0]
+                    if (mode.value == 0):
+                        # print("data", data)
+                        #print("fucking output angle", last_angle, target_angle, delta_angle, mode)
+                        data_send(data, dev)
+                elif debug_mode == 2:
+                    data = [target_v.value, delta_angle_manual, mode.value, 0]
+                    data_send(data, dev)
+            
             
 #def nano_mtc_main():
 if __name__ == '__main__':
     # debug_mode 0 will enable LDS
     # debug_mode 1 will disable LDS
     # debug mode 2 will fix an angle and let the velocity keeps being zero
-    debug_mode = 0
+    debug_mode = 1
 
     # Put all the shared memory variable here.. Plz keep comments well maintained
     is_hold = Value('i', 0)                 # indicate whether the lds is hold
@@ -206,7 +219,7 @@ if __name__ == '__main__':
     dev = init_data_rw()
     
     p1 = Process(target = route_decision, args = (dev, debug_mode, is_hold, target_v, target_angle, angle_stack, distance_stack, type_stack, cur_x_pos, cur_y_pos,\
-                                                        cur_angle, cur_vy, mode))
+                                                        cur_angle, cur_vy, mode, record_length))
 
     # This process keep talking to lds and return whether it's hold
     p3 = Process(target = lds_decision, args = (is_hold, debug_mode))
