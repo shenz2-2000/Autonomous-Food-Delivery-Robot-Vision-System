@@ -82,3 +82,9 @@ def data_read_test(dev, t = 0, len_msg = 13):
     #     data_stack.append(tem_data)
     #print("nano_read: ", data_stack, 'time:', time.time() - t)
     return 0,0,0,0,0
+
+if __name__ == "__main__":
+    device = init_data_rw()
+    while True:
+        data_read(device)
+        time.sleep(0.01)
