@@ -12,6 +12,7 @@ def lds_hold(cur_state, ser):
             return 1
     return 0
 
+
 def lds_decision(is_hold, debug_mode):
     '''
     Read from LDS and send hold status to other core

@@ -1,4 +1,5 @@
 import serial
+import time
 
 def int_to_bytes(x: int) -> bytes:
     return x.to_bytes((x.bit_length() + 7) // 8, 'big')
@@ -73,6 +74,7 @@ def lds_driver_test():
     while (1):
         res = lds_poll(ser)
         print(res[100])
-    return
+        time.sleep(0.01)
 
-#lds_driver_test()
+if __name__ == '__main__':
+    lds_driver_test()
