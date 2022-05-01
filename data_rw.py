@@ -29,7 +29,9 @@ def data_send(data_send, dev, t = 0):
     #dev.reset()
     t1 = time.time()
     V = data_send[0]
-    alpha, mode, error_status = data_send[1] + 180, data_send[2], data_send[3]
+    alpha, mode = data_send[1] + 180, data_send[2]
+    sector_map = {0:1, 1:0, 2:4, 3:2}
+    error_status = sector_map[data_send[3]]
 
     Vx, Vy = 3000, int(V) + 3000 #Now all V send will +3000 to ensure the send is positive, even when actual is negative 2022.03.28
 
@@ -60,7 +62,8 @@ def data_read(dev, len_msg = 13):
     data_stack.append((read_byte[11]))
     data_stack.append((read_byte[12]))
     data_stack[4] = data_stack[4]*360/8192
-    print("nano_read: ", data_stack)
+    # print("nano_read: ", data_stack)
+
     #print(get_chasis_spd(data_stack[0]-2500, data_stack[1]-2500, data_stack[2]-2500, data_stack[3]-2500))
     vx, vy = get_chasis_spd(data_stack[0]-2500, data_stack[1]-2500, data_stack[2]-2500, data_stack[3]-2500)
     return vx, vy, data_stack[4], data_stack[5], data_stack[6]
@@ -82,9 +85,3 @@ def data_read_test(dev, t = 0, len_msg = 13):
     #     data_stack.append(tem_data)
     #print("nano_read: ", data_stack, 'time:', time.time() - t)
     return 0,0,0,0,0
-
-if __name__ == "__main__":
-    device = init_data_rw()
-    while True:
-        data_read(device)
-        time.sleep(0.01)

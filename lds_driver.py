@@ -1,5 +1,7 @@
+import numpy
 import serial
-import time
+import numpy as np
+from heapq import nsmallest
 
 def int_to_bytes(x: int) -> bytes:
     return x.to_bytes((x.bit_length() + 7) // 8, 'big')
@@ -16,7 +18,7 @@ def lds_poll(ser):
     res = [-1] * 360
     # print(raw_bytes)
     start_count, good_sets, motor_speed = 0, 0, 0
-    while (~got_scan):
+    while (got_scan==False):
         raw_bytes[start_count] = bytes_to_int(ser.read(1))
         # print(ser.read(1))
         # if (raw_bytes[start_count] == b'\xfa'):
@@ -24,10 +26,10 @@ def lds_poll(ser):
         if (start_count == 0):
             if (raw_bytes[start_count] == bytes_to_int(b'\xfa')):
                 start_count = 1
-                # print("gdl")
+                #print("gdl")
         elif (start_count == 1):
             if (raw_bytes[start_count] == bytes_to_int(b'\xa0')):
-                # print("gdl2")
+                #print("gdl2")
                 start_count = 0
                 got_scan = True
                 data = ser.read(2518)
@@ -72,9 +74,29 @@ def lds_driver_test():
     ser = serial.Serial(port, baud_rate)
 
     while (1):
-        res = lds_poll(ser)
-        print(res[100])
-        time.sleep(0.01)
+        rge = lds_poll(ser)
+        sectors = [rge[315:] + rge[:45],  # front
+                   rge[45:135],  # left
+                   rge[135:225],  # back
+                   rge[225:315]]  # right
+        res = [0,0,0,0]
+        for id_sec in range(4):
+            sec = sectors[id_sec]
+            sec =numpy.array(sec)
+            sec = sec[sec>0]
+            if len(sec>2):
+                mins = nsmallest(2, sec)
+                score = 0.5 * (mins[0] + mins[1]) if mins[0] < 0.3 else mins[0]
+                res[id_sec] = score
+        print(res)
+
+        # rge = rge[rge > 0]
+        # if len(rge>2):
+        #     mins = nsmallest(2, rge)
+        #     score = 0.5*(mins[0]+mins[1]) if mins[0]<0.3 else mins[0]
+        #     # if score<0.4:
+        #     print(score)
+
 
 if __name__ == '__main__':
     lds_driver_test()
