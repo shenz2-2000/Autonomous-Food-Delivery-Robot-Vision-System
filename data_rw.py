@@ -30,7 +30,8 @@ def data_send(data_send, dev, t = 0):
     t1 = time.time()
     V = data_send[0]
     alpha, mode = data_send[1] + 180, data_send[2]
-    sector_map = {0:1, 1:0, 2:4, 3:2}
+    # sector_map = {0:1, 1:0, 2:4, 3:2}
+    sector_map = {0:1, 1:0, 2:4, 3:3, 4:2 }
     error_status = sector_map[data_send[3]]
 
     Vx, Vy = 3000, int(V) + 3000 #Now all V send will +3000 to ensure the send is positive, even when actual is negative 2022.03.28
@@ -49,11 +50,23 @@ def data_send(data_send, dev, t = 0):
     #print("nano send: ", [Vx, Vy, alpha, mode, error_status],'time:', time.time() - t)
     return 
 
-def data_read(dev, len_msg = 13):
-    dev.reset()
-    #read data from stm32
+def data_read(dev, len_msg = 64):
+    # dev.reset()
+    # read data from stm32
     # data_stack format [V_FR, V_FL, V_BL, V_BR, alpha, mode, error]  #Now all V received will -2500 to have both positive and negative 2022.03.28
-    read_byte = dev.read(0x81, len_msg, 100)
+    read_byte = None
+    try:
+        read_byte = dev.read(0x81, len_msg, 100)
+    except Exception as e:
+        if 'Overflow' in str(e):
+            print(e)
+            dev.reset()
+        else:
+            raise e
+
+    if (not read_byte) or len(read_byte)==0:
+        return None,None,None,None,None
+
     data_stack = []
     for i in range(1, 11, 2):
         tem_data = (int(read_byte[i] << 8) + int(read_byte[i+1]))
@@ -85,3 +98,21 @@ def data_read_test(dev, t = 0, len_msg = 13):
     #     data_stack.append(tem_data)
     #print("nano_read: ", data_stack, 'time:', time.time() - t)
     return 0,0,0,0,0
+
+if __name__ == '__main__':
+    dev = init_data_rw()
+    print(dev)
+    while(1):
+
+        try:
+            # start = time.time()
+            # data_send([0, 0, 5, 4], dev)
+            # end = time.time()
+            cur_vx, cur_vy, cur_angle, mode, turning_status = data_read(dev)
+            print(cur_angle)
+        except Exception as e:
+            start = time.time()
+            dev.reset()
+            print("reset",e, int((time.time()-start)*1000))
+
+        # time.sleep(0.005)

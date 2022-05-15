@@ -1,59 +1,60 @@
-# The hog detector only works when full body appears, and is slow (using CPU)
-
-# import the necessary packages
-import numpy as np
+import dlib
 import cv2
+import os
+import numpy as np
+import time
 
-# initialize the HOG descriptor/person detector
-hog = cv2.HOGDescriptor()
-hog.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
+hogFaceDetector = dlib.get_frontal_face_detector()
 
-cap = cv2.VideoCapture(0)
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-cap.set(cv2.CAP_PROP_FPS, 30)
+video_capture = cv2.VideoCapture(0)
 
-# open webcam video stream
-cv2.startWindowThread()
+# Initialize some variables
+faces = []
+process_this_frame = 0
 
-# the output will be written to output.avi
-out = cv2.VideoWriter(
-    'output.mp4',
-    cv2.VideoWriter_fourcc(*'mp4v'),
-    25.,
-    (640, 480))
+print('starting now')
+total_time = 0
+frame_cnt = 0
+detect_times = 0
+while True:
+    # Grab a single frame of video
+    start_time = time.time()
+    ret, frame = video_capture.read()
 
-while (True):
-    # Capture frame-by-frame
-    ret, frame = cap.read()
+    # Resize frame of video to 1/4 size for faster face recognition processing
 
-    # resizing for faster detection
-    frame = cv2.resize(frame, (640, 480))
-    # using a greyscale picture, also for faster detection
-    gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
+    # small_frame = cv2.resize(frame, (0, 0), fx=0.5, fy=0.5)
 
-    # detect people in the image
-    # returns the bounding boxes for the detected objects
-    boxes, weights = hog.detectMultiScale(frame, winStride=(8, 8))
+    # Convert the image from BGR color (which OpenCV uses) to RGB color (which face_recognition uses)
+    # rgb_small_frame = small_frame[:, :, ::-1]
 
-    boxes = np.array([[x, y, x + w, y + h] for (x, y, w, h) in boxes])
+    # Only process every other frame of video to save time
+    if process_this_frame==2:
+        process_this_frame = 0
+        # Find all the faces and face encodings in the current frame of video
+        # faces_cnn = cnn_face_detector(small_frame, 0)
+        faces = hogFaceDetector(frame, 0)
+        if len(faces)>0 and total_time>5: detect_times+=1
+        frame_cnt += 1
+    process_this_frame += 1
+    total_time += (time.time() - start_time)
+        # Display the results
+    for face in faces:
+        # draw box over face
+        cv2.rectangle(frame, (face.left(), face.top()), (face.right(), face.bottom()), (0, 0, 255), 2)
 
-    for (xA, yA, xB, yB) in boxes:
-        # display the detected boxes in the colour picture
-        cv2.rectangle(frame, (xA, yA), (xB, yB),
-                      (0, 255, 0), 2)
 
-    # Write the output video
-    out.write(frame.astype('uint8'))
-    # Display the resulting frame
-    cv2.imshow('frame', frame)
+
+    # Display the resulting image
+    cv2.imshow('Video', frame)
+
+    # Hit 'q' on the keyboard to quit!
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
-
-# When everything done, release the capture
-cap.release()
-# and release the output
-out.release()
-# finally, close the window
+    if total_time>65:
+        break
+print("frame rate", frame_cnt/(total_time-5))
+print("detect times", detect_times)
+# Release handle to the webcam
+video_capture.release()
 cv2.destroyAllWindows()
-cv2.waitKey(1)
