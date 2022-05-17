@@ -31,7 +31,7 @@ def data_send(data_send, dev, t = 0):
     V = data_send[0]
     alpha, mode = data_send[1] + 180, data_send[2]
     # sector_map = {0:1, 1:0, 2:4, 3:2}
-    sector_map = {0:1, 1:0, 2:4, 3:3, 4:2 }
+    sector_map = {0:1, 1:0, 2:4, 3:2, 4:3 }
     error_status = sector_map[data_send[3]]
 
     Vx, Vy = 3000, int(V) + 3000 #Now all V send will +3000 to ensure the send is positive, even when actual is negative 2022.03.28

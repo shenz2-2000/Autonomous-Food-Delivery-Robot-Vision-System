@@ -14,7 +14,7 @@
 #include "CSerialConnection.h"
 
 #define DEG2RAD(x) ((x)*M_PI/180.)
-
+#define FILTER 3
 
 typedef struct _rslidar_data
 {
@@ -34,9 +34,9 @@ using namespace everest::hwdrivers;
 
 
 void mymin(double *mn, double dis) {
-    for (int i = 0; i < 3; ++i)
+    for (int i = 0; i < FILTER + 3; ++i)
         if (dis < mn[i]) {
-            for (int j = i; j < 2; ++j) mn[j+1] = mn[j];
+            for (int j = i; j < FILTER + 2; ++j) mn[j+1] = mn[j];
             mn[i] = dis;
             break;
         }
@@ -84,33 +84,41 @@ int main(int argc, char * argv[])
                 std::vector<RslidarDataComplete> send_lidar_scan_data;
                 send_lidar_scan_data.resize(lidar_scan_size);
                 RslidarDataComplete one_lidar_data;
-                for(size_t i = 0; i < lidar_scan_size; i++)
-                {
-                    one_lidar_data.signal = lidar_scan.signal[i];
-                    one_lidar_data.angle = lidar_scan.angle[i];
-                    one_lidar_data.distance = lidar_scan.distance[i];
-                    send_lidar_scan_data[i] = one_lidar_data;
-                }
+//                for(size_t i = 0; i < lidar_scan_size; i++)
+//                {
+//                    one_lidar_data.signal = lidar_scan.signal[i];
+//                    one_lidar_data.angle = lidar_scan.angle[i];
+//                    one_lidar_data.distance = lidar_scan.distance[i];
+//                    send_lidar_scan_data[i] = one_lidar_data;
+//                }
 
                 // printf("Lidar count %d!\n", lidar_scan_size);
-                double mn0[3], mn1[3], mn2[3], mn3[3], mn4[3];
-                for (int i = 0; i < 3; ++i) mn0[i] = mn1[i] = mn2[i] = mn3[i] = mn4[i] = 100.0;
+
+                double mn0[FILTER + 3], mn1[FILTER + 3], mn2[FILTER + 3], mn3[FILTER + 3], mn4[FILTER + 3];
+                for (int i = 0; i < FILTER + 3; ++i) mn0[i] = mn1[i] = mn2[i] = mn3[i] = mn4[i] = 100.0;
                 for (int i = 0; i<lidar_scan_size; i++) if (lidar_scan.distance[i]!=0) {
                     double dis = lidar_scan.distance[i], angle = lidar_scan.angle[i];
-                    if (angle>315 || angle<30) mymin(mn0, dis);
-                    else if (angle>30 && angle<90) mymin(mn1, dis);
-                    else if (angle>90 && angle<150) mymin(mn2, dis);
-                    else if (angle>150 && angle<225) mymin(mn3, dis);
+                    if (angle>=90 && angle<150) mymin(mn0, dis);
+                    else if (angle>=150 && angle<230) mymin(mn1, dis);
+                    else if (angle>=230 && angle<310) mymin(mn2, dis);
+                    else if (angle>=310 || angle<30) mymin(mn3, dis);
                     else mymin(mn4, dis);
                 }
-                double res0 = (mn0[0]+mn0[1]+mn0[2])/3.0;
-                double res1 = (mn1[0]+mn1[1]+mn1[2])/3.0;
-                double res2 = (mn2[0]+mn2[1]+mn2[2])/3.0;
-                double res3 = (mn3[0]+mn3[1]+mn3[2])/3.0;
-                double res4 = (mn4[0]+mn4[1]+mn4[2])/3.0;
+                double res0 = (mn0[FILTER]+mn0[FILTER+1]+mn0[FILTER+2])/3.0;
+                double res1 = (mn1[FILTER]+mn1[FILTER+1]+mn1[FILTER+1])/3.0;
+                double res2 = (mn2[FILTER]+mn2[FILTER+1]+mn2[FILTER+1])/3.0;
+                double res3 = (mn3[FILTER]+mn3[FILTER+1]+mn3[FILTER+1])/3.0;
+                double res4 = (mn4[FILTER]+mn4[FILTER+1]+mn4[FILTER+1])/3.0;
                 cout<<"sec0_"<<res0<<"_sec1_"<<res1<<"_sec2_"<<res2<<"_sec3_"<<res3<<"_sec4_"<<res4<<endl;
-                // cout<<lidar_scan_size<<endl;
 
+                // cout<<lidar_scan_size<<endl;
+                // Some Trial Here
+                // double res[5];
+                // res[0] = res0, res[1] = res1, res[2] = res2, res[3] = res3, res[4] = res4;
+                // double mn =100;
+                // int sec = -1;
+                // for (int i = 0; i < 5; ++i) if (res[i] < mn) mn = res[i], sec = i;
+                // cout<<"dis"<<mn<<"sec"<<sec<<endl;
                 break;
             }
             case LIDAR_GRAB_ERRO:

@@ -10,8 +10,11 @@ from data_rw import data_send, init_data_rw, data_read
 from multiprocessing import Value, Array
 from heapq import nsmallest
 
-TOO_CLOSE = np.array([0.55, 0.5, 0.45, 0.5, 0.55])
-A_BIT_CLOSE = np.array([1.1, 1.05, 1.0, 1.05, 1.1])
+VALID_HEIGHT = 140
+VALID_WIDTH = 140
+
+TOO_CLOSE = np.array([0.6, 0.5, 0.5, 0.5, 0.6])
+A_BIT_CLOSE = np.array([1.3, 1.2, 1.15, 1.2, 1.3])
 # TOO_CLOSE = 0.5  # 0.6
 # A_BIT_CLOSE = 1.1  # the range you should care
 COMING = 0.2  # the relative speed defined as approaching
@@ -23,7 +26,7 @@ def face_detector(lds_dists, sec_id, detected):
     last_too_close_flag = 0
     last_turned_time = 0
     net = jetson.inference.detectNet("facenet", threshold=0.15)
-    camera = jetson.utils.videoSource("/dev/video0",['--input-width=800','--input-height=600', '--input-codec=mjpeg'])      # '/dev/video0' for V4L2
+    camera = jetson.utils.videoSource("/dev/video0",['--input-codec=mjpeg'])      # '/dev/video0' for V4L2
     # display = jetson.utils.videoOutput()
     while True:
         # Grab a single frame of video
@@ -49,8 +52,13 @@ def face_detector(lds_dists, sec_id, detected):
 
         # for detection in detections:
         #     print(detection)
-
-        if len(detections) > 0:
+        cnt = 0
+        for detection in detections:
+            if detection.Height<VALID_HEIGHT and detection.Width<VALID_WIDTH:
+                continue
+            else:
+                cnt += 1
+        if cnt > 0:
             print('detected by the camera', sec_id.value)
             camera_detected = 1
             # works but currently not used
@@ -437,7 +445,7 @@ if __name__ == '__main__':
             if (a[0] == "s" and a[1] == "e" and a[2] == "c"):
                 target = a.split("_")
                 # print(target)
-                lds_dists[3], lds_dists[4], lds_dists[0], lds_dists[1], lds_dists[2] = \
+                lds_dists[0], lds_dists[1], lds_dists[2], lds_dists[3], lds_dists[4] = \
                     float(target[1]), float(target[3]), float(target[5]), float(target[7]), float(target[9])
 
                 # distance, angle = float(target[1]), int(target[3])
